@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js 塔罗 - 时间流三牌阵</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Microsoft YaHei', sans-serif; color: #fff; }
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
+        
+        /* 顶部控制 */
+        .hud-panel { position: absolute; pointer-events: auto; }
+        #controls { top: 20px; left: 20px; display: flex; gap: 10px; align-items: center; }
+        button { 
+            background: rgba(0,0,0,0.6); color: #fff; border: 1px solid #666; 
+            padding: 6px 15px; cursor: pointer; transition: all 0.3s; border-radius: 4px;
+        }
+        button:hover { background: #fff; color: #000; }
+        
+        #video-preview { width: 120px; height: 90px; transform: scaleX(-1); border: 1px solid #333; display: none; margin-top: 10px; opacity: 0.8; }
+        
+        /* 历史记录 */
+        #history-panel {
+            position: absolute; top: 20px; right: 20px; width: 260px; max-height: 400px;
+            background: rgba(0, 0, 0, 0.85); border: 1px solid #333; border-radius: 8px; padding: 15px;
+            pointer-events: auto; display: flex; flex-direction: column; overflow-y: auto;
+        }
+        .history-item { font-size: 12px; color: #ccc; margin-bottom: 5px; border-bottom: 1px solid #222; padding-bottom: 4px; }
+        
+        /* 状态指引 */
+        #guide-text { 
+            position: absolute; top: 15%; width: 100%; text-align: center; 
+            font-size: 24px; text-shadow: 0 0 10px rgba(255,255,255,0.5); letter-spacing: 2px;
+            transition: all 0.5s;
+        }
+        #status-text { 
+            position: absolute; bottom: 120px; width: 100%; text-align: center; 
+            font-size: 14px; opacity: 0.6; pointer-events: none; 
+        }
+        
+        /* 最终解读面板 */
+        #reading-panel { 
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 45%; 
+            background: linear-gradient(to top, rgba(0,0,0,1), rgba(0,0,0,0.8));
+            transform: translateY(100%); transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+            pointer-events: auto; display: flex; flex-direction: column; align-items: center; padding-top: 20px;
+        }
+        #reading-panel.active { transform: translateY(0); }
+        
+        .reading-content { display: flex; justify-content: center; gap: 20px; width: 90%; max-width: 1200px; }
+        .reading-card { flex: 1; background: rgba(20,20,20,0.8); border: 1px solid #444; padding: 15px; border-radius: 8px; font-size: 13px; line-height: 1.5; }
+        .reading-card h3 { color: #d4af37; margin: 0 0 10px 0; font-size: 16px; border-bottom: 1px solid #444; padding-bottom: 5px; }
+        .reading-card h4 { color: #fff; margin: 0 0 5px 0; font-size: 14px; }
+        .reading-card .pos-desc { color: #888; font-style: italic; margin-bottom: 8px; font-size: 12px; }
+        
+        #final-action { margin-top: 20px; color: #aaa; font-size: 14px; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+        #loader { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.2rem; }
+    </style>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+    <div id="loader">初始化中...</div>
+
+    <div id="ui-layer">
+        <div id="controls" class="hud-panel">
+            <button id="btn-mode-hand">🖐 手势模式</button>
+            <button id="btn-mode-mouse">🖱️ 鼠标模式</button>
+            <div id="gesture-indicator" style="font-size:12px; color:#aaa; margin-top:5px;">等待中...</div>
+            <video id="video-preview" playsinline></video>
+        </div>
+
+        <div id="history-panel">
+            <div style="border-bottom:1px solid #444; padding-bottom:5px; margin-bottom:5px;">
+                抽取历史 <span id="deck-count" style="float:right; color:#888;"></span>
+            </div>
+            <div id="history-list"></div>
+        </div>
+
+        <div id="guide-text">请抽取第一张：过去 / 成因</div>
+        <div id="status-text">滑动下方牌库选择 • 居中确认</div>
+
+        <!-- 底部解读面板 -->
+        <div id="reading-panel">
+            <div class="reading-content">
+                <div class="reading-card" id="read-pos-1"></div>
+                <div class="reading-card" id="read-pos-2"></div>
+                <div class="reading-card" id="read-pos-3"></div>
+            </div>
+            <div id="final-action">握拳 或 点击任意处 -> 燃尽一切，重新开始</div>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+<script>
+// ==========================================
+// 0. 数据定义
+// ==========================================
+// 完整22张大阿卡那
+const FULL_DECK_DATA = [
+    { id: 0, name: "0. 愚者", url: "https://upload.wikimedia.org/wikipedia/commons/9/90/RWS_Tarot_00_Fool.jpg", up: "新的开始、天真、自由精神", rev: "鲁莽、轻率、风险" },
+    { id: 1, name: "I. 魔术师", url: "https://upload.wikimedia.org/wikipedia/commons/d/de/RWS_Tarot_01_Magician.jpg", up: "创造力、技能、意志力", rev: "欺骗、才华被埋没" },
+    { id: 2, name: "II. 女祭司", url: "https://upload.wikimedia.org/wikipedia/commons/8/88/RWS_Tarot_02_High_Priestess.jpg", up: "直觉、潜意识、神秘", rev: "秘密泄露、压抑情感" },
+    { id: 3, name: "III. 皇后", url: "https://upload.wikimedia.org/wikipedia/commons/d/d2/RWS_Tarot_03_Empress.jpg", up: "丰饶、母性、自然", rev: "依赖、创造力受阻" },
+    { id: 4, name: "IV. 皇帝", url: "https://upload.wikimedia.org/wikipedia/commons/c/c3/RWS_Tarot_04_Emperor.jpg", up: "权威、结构、稳固", rev: "暴政、僵化、冷酷" },
+    { id: 5, name: "V. 教皇", url: "https://upload.wikimedia.org/wikipedia/commons/8/8d/RWS_Tarot_05_Hierophant.jpg", up: "传统、信仰、精神指引", rev: "挑战传统、虚伪、误导" },
+    { id: 6, name: "VI. 恋人", url: "https://upload.wikimedia.org/wikipedia/commons/d/db/RWS_Tarot_06_Lovers.jpg", up: "爱、和谐、选择", rev: "分离、不平衡、冲突" },
+    { id: 7, name: "VII. 战车", url: "https://upload.wikimedia.org/wikipedia/commons/9/9b/RWS_Tarot_07_Chariot.jpg", up: "控制、意志力、胜利", rev: "失控、攻击性、失败" },
+    { id: 8, name: "VIII. 力量", url: "https://upload.wikimedia.org/wikipedia/commons/f/f5/RWS_Tarot_08_Strength.jpg", up: "力量、勇气、耐心", rev: "软弱、自我怀疑、生病" },
+    { id: 9, name: "IX. 隐士", url: "https://upload.wikimedia.org/wikipedia/commons/4/4d/RWS_Tarot_09_Hermit.jpg", up: "内省、孤独、指引", rev: "孤立、迷失、拒绝建议" },
+    { id: 10, name: "X. 命运之轮", url: "https://upload.wikimedia.org/wikipedia/commons/3/3c/RWS_Tarot_10_Wheel_of_Fortune.jpg", up: "好运、因果、转折点", rev: "厄运、抵抗改变" },
+    { id: 11, name: "XI. 正义", url: "https://upload.wikimedia.org/wikipedia/commons/e/e0/RWS_Tarot_11_Justice.jpg", up: "正义、公平、真理", rev: "不公、不诚实、逃避责任" },
+    { id: 12, name: "XII. 倒吊人", url: "https://upload.wikimedia.org/wikipedia/commons/2/2b/RWS_Tarot_12_Hanged_Man.jpg", up: "牺牲、等待、新视角", rev: "拖延、无谓的牺牲" },
+    { id: 13, name: "XIII. 死神", url: "https://upload.wikimedia.org/wikipedia/commons/d/d7/RWS_Tarot_13_Death.jpg", up: "结束、转变、重生", rev: "抗拒改变、停滞" },
+    { id: 14, name: "XIV. 节制", url: "https://upload.wikimedia.org/wikipedia/commons/f/f8/RWS_Tarot_14_Temperance.jpg", up: "平衡、适度、耐心", rev: "失衡、过度、匆忙" },
+    { id: 15, name: "XV. 恶魔", url: "https://upload.wikimedia.org/wikipedia/commons/5/55/RWS_Tarot_15_Devil.jpg", up: "束缚、物质主义、诱惑", rev: "打破束缚、重获自由" },
+    { id: 16, name: "XVI. 高塔", url: "https://upload.wikimedia.org/wikipedia/commons/5/53/RWS_Tarot_16_Tower.jpg", up: "突然的剧变、灾难、觉醒", rev: "避免灾难、恐惧改变" },
+    { id: 17, name: "XVII. 星星", url: "https://upload.wikimedia.org/wikipedia/commons/d/db/RWS_Tarot_17_Star.jpg", up: "希望、信念、灵感", rev: "绝望、缺乏信心" },
+    { id: 18, name: "XVIII. 月亮", url: "https://upload.wikimedia.org/wikipedia/commons/7/7f/RWS_Tarot_18_Moon.jpg", up: "幻觉、恐惧、潜意识", rev: "释放恐惧、不幸" },
+    { id: 19, name: "XIX. 太阳", url: "https://upload.wikimedia.org/wikipedia/commons/1/17/RWS_Tarot_19_Sun.jpg", up: "快乐、成功、活力", rev: "消沉、暂时的挫折" },
+    { id: 20, name: "XX. 审判", url: "https://upload.wikimedia.org/wikipedia/commons/d/dd/RWS_Tarot_20_Judgement.jpg", up: "审判、重生、内心召唤", rev: "自我怀疑、拒绝召唤" },
+    { id: 21, name: "XXI. 世界", url: "https://upload.wikimedia.org/wikipedia/commons/f/ff/RWS_Tarot_21_World.jpg", up: "完成、整合、成就", rev: "未完成、缺乏闭环" }
+];
+
+// 阵法位置含义定义
+const SPREAD_DEFINITIONS = [
+    { title: "位置1：过去 / 成因",  up_desc: "完整表达/奠基的能量", rev_desc: "阻塞/未完成/压抑的能量" },
+    { title: "位置2：现在 / 现状",  up_desc: "明显的课题/需要整合的能量", rev_desc: "隐秘的课题/抗拒的能量" },
+    { title: "位置3：未来 / 发展",  up_desc: "顺畅显化/直接结果", rev_desc: "延迟显化/需要调整/内部阻力" }
+];
+
+const CONFIG = {
+    cardWidth: 2.0, cardHeight: 3.5, cardRadius: 0.1, cardSpacing: 2.5,
+    scrollSpeed: 4.0, friction: 0.92, snapStrength: 0.08, handSensitivity: 8.0,
+    slotPositions: [ // 上方三个卡槽坐标
+        new THREE.Vector3(-3.5, 1.8, 0), // 过去
+        new THREE.Vector3(0, 1.8, 0),    // 现在
+        new THREE.Vector3(3.5, 1.8, 0)   // 未来
+    ]
+};
+
+const STATE = {
+    mode: 'HAND', 
+    phase: 'SCROLL', // SCROLL -> ANIMATING -> READING -> ASH
+    
+    // 滚动条状态
+    scrollPos: 0, velocity: 0, isDragging: false, lastInputX: 0, selectedIndex: 0,
+    
+    // 牌库与卡槽
+    remainingDeck: [],       // 剩余未抽取的牌数据
+    deckVisuals: [],         // 底部滚动条里的 Mesh 对象
+    placedCards: [],         // 已经抽出的3张牌 Mesh 对象
+    
+    currentSlot: 0           // 当前正在抽第几张 (0, 1, 2)
+};
+
+// ==========================================
+// 1. 3D 基础构建
+// ==========================================
+function createRoundedCardGeometry(width, height, radius) {
+    const shape = new THREE.Shape();
+    const x = -width/2, y = -height/2;
+    shape.moveTo(x+radius, y); shape.lineTo(x+width-radius, y);
+    shape.quadraticCurveTo(x+width, y, x+width, y+radius);
+    shape.lineTo(x+width, y+height-radius);
+    shape.quadraticCurveTo(x+width, y+height, x+width-radius, y+height);
+    shape.lineTo(x+radius, y+height);
+    shape.quadraticCurveTo(x, y+height, x, y+height-radius);
+    shape.lineTo(x, y+radius); shape.quadraticCurveTo(x, y, x+radius, y);
+
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.02, bevelEnabled: false, curveSegments: 12 });
+    geo.computeBoundingBox();
+    const min = geo.boundingBox.min, max = geo.boundingBox.max;
+    const range = new THREE.Vector2(max.x-min.x, max.y-min.y);
+    const uv = geo.attributes.uv; const pos = geo.attributes.position;
+    for(let i=0; i<pos.count; i++) uv.setXY(i, (pos.getX(i)-min.x)/range.x, (pos.getY(i)-min.y)/range.y);
+    geo.center();
+    return geo;
+}
+
+function createCardBackTexture() {
+    const cvs = document.createElement('canvas'); cvs.width=512; cvs.height=800;
+    const ctx = cvs.getContext('2d');
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,512,800);
+    ctx.strokeStyle='#f0f0f0'; ctx.lineWidth=10; ctx.strokeRect(10,10,492,780);
+    return new THREE.CanvasTexture(cvs);
+}
+
+// ==========================================
+// 2. Three.js 初始化
+// ==========================================
+let scene, camera, renderer;
+let deckGroup = new THREE.Group(); // 底部滚动组
+let slotsGroup = new THREE.Group(); // 上方卡槽组
+let ashSystems = []; // 粒子系统数组
+let sharedGeo = createRoundedCardGeometry(CONFIG.cardWidth, CONFIG.cardHeight, CONFIG.cardRadius);
+
+function initThree() {
+    const container = document.getElementById('canvas-container');
+    scene = new THREE.Scene(); scene.background = new THREE.Color(0x000000);
+    
+    camera = new THREE.PerspectiveCamera(40, window.innerWidth/window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, 16); // 稍微拉远
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    container.appendChild(renderer.domElement);
+
+    const amb = new THREE.AmbientLight(0xffffff, 0.6); scene.add(amb);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.8); dir.position.set(0, 5, 10); scene.add(dir);
+
+    // 两个分组
+    deckGroup.position.y = -2.5; // 底部
+    scene.add(deckGroup);
+    scene.add(slotsGroup);
+
+    resetDeck();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+    
+    animate();
+}
+
+function resetDeck() {
+    // 重置状态
+    STATE.currentSlot = 0;
+    STATE.placedCards = [];
+    STATE.deckVisuals = [];
+    STATE.phase = 'SCROLL';
+    STATE.remainingDeck = [...FULL_DECK_DATA];
+    
+    // 洗牌
+    for (let i = STATE.remainingDeck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [STATE.remainingDeck[i], STATE.remainingDeck[j]] = [STATE.remainingDeck[j], STATE.remainingDeck[i]];
+    }
+
+    createDeckVisuals();
+    updateGuideText();
+    document.getElementById('deck-count').innerText = `剩余: 22`;
+    document.getElementById('reading-panel').classList.remove('active');
+}
+
+function createDeckVisuals() {
+    // 清空底部显示
+    while(deckGroup.children.length > 0) deckGroup.remove(deckGroup.children[0]);
+    STATE.deckVisuals = [];
+    
+    const backTex = createCardBackTexture();
+
+    STATE.remainingDeck.forEach((data, i) => {
+        const mat = new THREE.MeshStandardMaterial({ map: backTex, roughness:0.6, metalness:0.1 });
+        const side = new THREE.MeshStandardMaterial({ color:0xeeeeee });
+        const mesh = new THREE.Mesh(sharedGeo, [mat, side]);
+        
+        const group = new THREE.Group();
+        group.add(mesh);
+        group.position.x = i * CONFIG.cardSpacing;
+        
+        const cardObj = {
+            group: group, mesh: mesh, data: data,
+            isReversed: Math.random() < 0.5,
+            textures: { back: backTex, front: null },
+            flipped: false
+        };
+        // 懒加载
+        new THREE.TextureLoader().load(data.url, (t) => cardObj.textures.front = t);
+
+        deckGroup.add(group);
+        STATE.deckVisuals.push(cardObj);
+    });
+
+    STATE.scrollPos = -((STATE.remainingDeck.length-1)*CONFIG.cardSpacing)/2;
+}
+
+// ==========================================
+// 3. 核心逻辑 (物理+状态机)
+// ==========================================
+function animate() {
+    requestAnimationFrame(animate);
+    
+    updatePhysics();
+    updateDeckVisuals(); // 缩放效果
+    updateAsh();
+    
+    renderer.render(scene, camera);
+}
+
+function updatePhysics() {
+    if (STATE.phase !== 'SCROLL') return;
+
+    // 拖拽物理
+    if (STATE.isDragging) {
+        STATE.velocity = (STATE.lastInputX - STATE.dragStartX) * CONFIG.scrollSpeed;
+    } 
+    STATE.scrollPos += STATE.velocity;
+
+    if (!STATE.isDragging) {
+        STATE.velocity *= CONFIG.friction;
+        const count = STATE.deckVisuals.length;
+        if (count === 0) return;
+
+        const min = -((count-1)*CONFIG.cardSpacing);
+        if (STATE.scrollPos > 0) STATE.velocity += (0 - STATE.scrollPos)*0.1;
+        else if (STATE.scrollPos < min) STATE.velocity += (min - STATE.scrollPos)*0.1;
+        else if (Math.abs(STATE.velocity) < 0.05) {
+            // 吸附
+            const idx = Math.round(-STATE.scrollPos / CONFIG.cardSpacing);
+            const target = -idx * CONFIG.cardSpacing;
+            STATE.scrollPos += (target - STATE.scrollPos)*CONFIG.snapStrength;
+            STATE.velocity *= 0.5;
+            STATE.selectedIndex = Math.max(0, Math.min(count-1, idx));
+        }
+    }
+}
+
+function updateDeckVisuals() {
+    STATE.deckVisuals.forEach((c, i) => {
+        const x = i * CONFIG.cardSpacing + STATE.scrollPos;
+        c.group.position.x = x;
+        // 中心凸起效果
+        const dist = Math.abs(x);
+        const scale = 1 + 0.15 * Math.exp(-(dist*dist)/2);
+        c.group.scale.set(scale, scale, scale);
+        c.group.position.z = 2 - dist * 0.5;
+    });
+}
+
+function confirmSelection() {
+    if (STATE.phase !== 'SCROLL' || Math.abs(STATE.velocity) > 0.1) return;
+    if (STATE.currentSlot >= 3) return; // 已经抽了3张
+
+    const card = STATE.deckVisuals[STATE.selectedIndex];
+    if (!card) return;
+
+    STATE.phase = 'ANIMATING'; // 锁定输入
+
+    // 1. 从底部数组移除
+    STATE.deckVisuals.splice(STATE.selectedIndex, 1);
+    STATE.remainingDeck.splice(STATE.selectedIndex, 1); // 逻辑移除
+    deckGroup.remove(card.group); // 视觉移除
+    
+    // 2. 加入到上层卡槽组
+    slotsGroup.add(card.group);
+    STATE.placedCards.push(card);
+
+    // 3. 修正坐标 (从 deckGroup 局部坐标转换到 slotsGroup)
+    // deckGroup 在 y=-2.5. slotGroup 在 y=0.
+    // 所以原来的 y=0 其实是 y=-2.5
+    card.group.position.y = -2.5; 
+    // x 保持不变 (当前吸附位置约等于0)
+    card.group.position.x = 0; 
+    card.group.position.z = 2; // 前面一点
+
+    // 4. 飞向目标卡槽动画
+    const targetPos = CONFIG.slotPositions[STATE.currentSlot];
+    const isRev = card.isReversed;
+    
+    let progress = 0;
+    function flyAnimation() {
+        progress += 0.025;
+        const ease = 1 - Math.pow(1 - progress, 3);
+        
+        // 位移
+        card.group.position.lerp(targetPos, 0.1);
+        
+        // 旋转 (Y轴翻转)
+        card.group.rotation.y += 0.15;
+        
+        // 翻面
+        if (!card.flipped && card.group.rotation.y > Math.PI/2) {
+             if (card.textures.front) {
+                card.mesh.material[0].map = card.textures.front;
+                card.mesh.material[0].needsUpdate = true;
+             }
+             card.flipped = true;
+             if (isRev) card.group.rotation.z = Math.PI;
+        }
+
+        if (progress < 1 || card.group.rotation.y < Math.PI * 2) {
+            requestAnimationFrame(flyAnimation);
+        } else {
+            // 动画结束
+            card.group.rotation.y = 0;
+            if (isRev) card.group.rotation.z = Math.PI;
+            
+            // 记录历史
+            addToHistory(`${SPREAD_DEFINITIONS[STATE.currentSlot].title.split('：')[1]}`, card.data.name, !isRev);
+            
+            // 推进状态
+            STATE.currentSlot++;
+            
+            if (STATE.currentSlot < 3) {
+                // 继续抽下一张
+                rearrangeDeckAfterDraw();
+                STATE.phase = 'SCROLL';
+                updateGuideText();
+            } else {
+                // 抽完了3张
+                showReadingPanel();
+                STATE.phase = 'READING';
+                document.getElementById('guide-text').innerText = "三牌时间流 • 命运显现";
+                document.getElementById('status-text').innerText = "";
+            }
+        }
+    }
+    flyAnimation();
+}
+
+function rearrangeDeckAfterDraw() {
+    // 重新排列剩余的底部卡牌，使其居中
+    STATE.scrollPos = -((STATE.deckVisuals.length-1)*CONFIG.cardSpacing)/2;
+    STATE.velocity = 0;
+    document.getElementById('deck-count').innerText = `剩余: ${STATE.remainingDeck.length}`;
+}
+
+function updateGuideText() {
+    const texts = ["请抽取第一张：过去 / 成因", "请抽取第二张：现在 / 现状", "请抽取第三张：未来 / 发展"];
+    if (STATE.currentSlot < 3) {
+        document.getElementById('guide-text').innerText = texts[STATE.currentSlot];
+    }
+}
+
+// ==========================================
+// 4. 解读与燃烧
+// ==========================================
+function showReadingPanel() {
+    const panel = document.getElementById('reading-panel');
+    
+    STATE.placedCards.forEach((card, i) => {
+        const def = SPREAD_DEFINITIONS[i];
+        const el = document.getElementById(`read-pos-${i+1}`);
+        const isUp = !card.isReversed;
+        
+        // 生成动态解读文本
+        const statusText = isUp ? "【正位】" : "【逆位】";
+        const meaning = isUp ? card.data.up : card.data.rev;
+        const advice = isUp ? def.up_desc : def.rev_desc;
+        
+        el.innerHTML = `
+            <h3>${def.title}</h3>
+            <h4>${card.data.name} ${statusText}</h4>
+            <div class="pos-desc">能量状态：${advice}</div>
+            <div>${meaning}</div>
+        `;
+    });
+    
+    panel.classList.add('active');
+}
+
+function triggerBurnAll() {
+    if (STATE.phase !== 'READING') return;
+    STATE.phase = 'ASH';
+    
+    // 隐藏UI
+    document.getElementById('reading-panel').classList.remove('active');
+    document.getElementById('guide-text').innerText = "";
+    
+    // 对三张牌同时生成粒子
+    STATE.placedCards.forEach((card) => {
+        createAsh(card.group);
+        slotsGroup.remove(card.group);
+    });
+    STATE.placedCards = [];
+}
+
+function createAsh(obj) {
+    const geo = new THREE.BufferGeometry();
+    const count = 4000;
+    const pos = [], spd = [];
+    
+    // 获取世界坐标
+    const worldPos = new THREE.Vector3();
+    obj.getWorldPosition(worldPos);
+
+    for(let i=0; i<count; i++) {
+        pos.push(
+            worldPos.x + (Math.random()-0.5)*2,
+            worldPos.y + (Math.random()-0.5)*3.5, 
+            worldPos.z
+        );
+        spd.push(Math.random()*0.05 + 0.02);
+    }
+    
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('speed', new THREE.Float32BufferAttribute(spd, 1));
+    
+    const mat = new THREE.PointsMaterial({
+        color: 0xffffff, size: 0.05, transparent: true, opacity: 1, blending: THREE.AdditiveBlending
+    });
+    
+    const sys = new THREE.Points(geo, mat);
+    scene.add(sys);
+    ashSystems.push(sys);
+}
+
+function updateAsh() {
+    for (let i = ashSystems.length - 1; i >= 0; i--) {
+        const sys = ashSystems[i];
+        const pos = sys.geometry.attributes.position.array;
+        const spd = sys.geometry.attributes.speed.array;
+        
+        sys.material.opacity -= 0.015;
+        
+        for(let j=0; j<pos.length/3; j++) {
+            pos[j*3+1] += spd[j]; // Y up
+            pos[j*3] += (Math.random()-0.5)*0.03;
+        }
+        sys.geometry.attributes.position.needsUpdate = true;
+        
+        if (sys.material.opacity <= 0) {
+            scene.remove(sys);
+            ashSystems.splice(i, 1);
+            
+            // 如果所有粒子都消失了，重置
+            if (ashSystems.length === 0) {
+                resetDeck();
+            }
+        }
+    }
+}
+
+// 历史记录
+function addToHistory(pos, name, isUp) {
+    const list = document.getElementById('history-list');
+    const div = document.createElement('div');
+    div.className = 'history-item';
+    div.innerHTML = `
+        <span style="color:#888;">[${pos}]</span> 
+        ${name} 
+        <span style="color:${isUp?'#4caf50':'#f44336'}">${isUp?'正':'逆'}</span>
+    `;
+    list.prepend(div);
+}
+
+// ==========================================
+// 5. 输入处理
+// ==========================================
+let lastInputX = 0;
+
+// 鼠标
+window.addEventListener('mousedown', e => {
+    if (STATE.mode!=='MOUSE') return;
+    if (STATE.phase === 'SCROLL') {
+        STATE.isDragging = true;
+        STATE.dragStartX = (e.clientX/window.innerWidth)*2-1;
+        STATE.lastInputX = STATE.dragStartX;
+        STATE.velocity = 0;
+    } else if (STATE.phase === 'READING') {
+        triggerBurnAll();
+    }
+});
+window.addEventListener('mousemove', e => {
+    if (STATE.mode!=='MOUSE') return;
+    const x = (e.clientX/window.innerWidth)*2-1;
+    if (STATE.isDragging) {
+        STATE.velocity = (x - STATE.lastInputX) * CONFIG.scrollSpeed;
+        STATE.lastInputX = x;
+    }
+});
+window.addEventListener('mouseup', () => {
+    if (STATE.isDragging) {
+        STATE.isDragging = false;
+        if(Math.abs(STATE.velocity) < 0.01) confirmSelection();
+    }
+});
+
+// 手势
+function onResults(res) {
+    if (STATE.mode !== 'HAND' || !res.multiHandLandmarks[0]) return;
+    const lm = res.multiHandLandmarks[0];
+    const x = (1 - lm[8].x)*2-1;
+    const isPinch = Math.hypot(lm[8].x-lm[4].x, lm[8].y-lm[4].y) < 0.05;
+    const isFist = Math.hypot(lm[8].x-lm[0].x, lm[8].y-lm[0].y) < 0.25;
+    
+    updateGestureUI(isFist?'FIST':(isPinch?'PINCH':'OPEN'));
+
+    if (STATE.phase === 'SCROLL') {
+        if (isPinch) {
+            if (!STATE.isDragging) {
+                STATE.isDragging = true; STATE.dragStartX = x; STATE.lastInputX = x;
+            } else {
+                STATE.velocity = (x - STATE.lastInputX) * CONFIG.handSensitivity;
+                STATE.lastInputX = x;
+            }
+        } else {
+            if (STATE.isDragging) STATE.isDragging = false;
+            if (isFist && Math.abs(STATE.velocity) < 0.1) confirmSelection();
+        }
+    } else if (STATE.phase === 'READING') {
+        if (isFist) triggerBurnAll();
+    }
+}
+
+// 辅助函数
+function updateGestureUI(txt) {
+    const el = document.getElementById('gesture-indicator');
+    el.innerText = txt;
+    el.style.color = txt==='OPEN' ? '#aaa' : '#ffeb3b';
+}
+document.getElementById('btn-mode-hand').onclick = () => { STATE.mode='HAND'; document.getElementById('video-preview').style.display='block'; setupCamera(); };
+document.getElementById('btn-mode-mouse').onclick = () => { STATE.mode='MOUSE'; document.getElementById('video-preview').style.display='none'; };
+
+async function setupCamera() {
+    const vid = document.getElementById('video-preview');
+    const hands = new Hands({locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+    hands.setOptions({maxNumHands: 1, minDetectionConfidence: 0.7});
+    hands.onResults(onResults);
+    const cam = new Camera(vid, {onFrame: async()=>{await hands.send({image:vid})}, width:640, height:480});
+    await cam.start();
+    document.getElementById('loader').style.display='none';
+}
+
+setTimeout(()=>document.getElementById('loader').style.display='none', 1000);
+initThree();
+</script>
+</body>
+</html>

@@ -105,23 +105,23 @@
 // 0. 数据定义
 // ==========================================
 const FULL_DECK_DATA = [
-    { id: 0, name: "愚者", url: "https://upload.wikimedia.org/wikipedia/commons/9/90/RWS_Tarot_00_Fool.jpg", up: "新的开始、天真、自由精神", rev: "鲁莽、轻率、风险" },
-    { id: 1, name: "魔术师", url: "https://upload.wikimedia.org/wikipedia/commons/d/de/RWS_Tarot_01_Magician.jpg", up: "创造力、技能、意志力", rev: "欺骗、才华被埋没" },
-    { id: 2, name: "女祭司", url: "https://upload.wikimedia.org/wikipedia/commons/8/88/RWS_Tarot_02_High_Priestess.jpg", up: "直觉、潜意识、神秘", rev: "秘密泄露、压抑情感" },
-    { id: 3, name: "皇后", url: "https://upload.wikimedia.org/wikipedia/commons/d/d2/RWS_Tarot_03_Empress.jpg", up: "丰饶、母性、自然", rev: "依赖、创造力受阻" },
-    { id: 4, name: "皇帝", url: "https://upload.wikimedia.org/wikipedia/commons/c/c3/RWS_Tarot_04_Emperor.jpg", up: "权威、结构、稳固", rev: "暴政、僵化、冷酷" },
-    { id: 5, name: "教皇", url: "https://upload.wikimedia.org/wikipedia/commons/8/8d/RWS_Tarot_05_Hierophant.jpg", up: "传统、信仰、精神指引", rev: "挑战传统、虚伪" },
-    { id: 6, name: "恋人", url: "https://upload.wikimedia.org/wikipedia/commons/d/db/RWS_Tarot_06_Lovers.jpg", up: "爱、和谐、选择", rev: "分离、不平衡、冲突" },
-    { id: 7, name: "战车", url: "https://upload.wikimedia.org/wikipedia/commons/9/9b/RWS_Tarot_07_Chariot.jpg", up: "控制、意志力、胜利", rev: "失控、攻击性、失败" },
-    { id: 8, name: "力量", url: "https://upload.wikimedia.org/wikipedia/commons/f/f5/RWS_Tarot_08_Strength.jpg", up: "力量、勇气、耐心", rev: "软弱、自我怀疑" },
-    { id: 9, name: "隐士", url: "https://upload.wikimedia.org/wikipedia/commons/4/4d/RWS_Tarot_09_Hermit.jpg", up: "内省、孤独、指引", rev: "孤立、迷失" },
-    { id: 10, name: "命运之轮", url: "https://upload.wikimedia.org/wikipedia/commons/3/3c/RWS_Tarot_10_Wheel_of_Fortune.jpg", up: "好运、因果、转折", rev: "厄运、抵抗改变" },
-    { id: 13, name: "死神", url: "https://upload.wikimedia.org/wikipedia/commons/d/d7/RWS_Tarot_13_Death.jpg", up: "结束、转变、重生", rev: "抗拒改变、停滞" },
-    { id: 16, name: "高塔", url: "https://upload.wikimedia.org/wikipedia/commons/5/53/RWS_Tarot_16_Tower.jpg", up: "剧变、灾难、觉醒", rev: "避免灾难、恐惧改变" },
-    { id: 17, name: "星星", url: "https://upload.wikimedia.org/wikipedia/commons/d/db/RWS_Tarot_17_Star.jpg", up: "希望、信念、灵感", rev: "绝望、缺乏信心" },
-    { id: 18, name: "月亮", url: "https://upload.wikimedia.org/wikipedia/commons/7/7f/RWS_Tarot_18_Moon.jpg", up: "幻觉、恐惧、潜意识", rev: "释放恐惧、不幸" },
-    { id: 19, name: "太阳", url: "https://upload.wikimedia.org/wikipedia/commons/1/17/RWS_Tarot_19_Sun.jpg", up: "快乐、成功、活力", rev: "消沉、暂时的挫折" },
-    { id: 21, name: "世界", url: "https://upload.wikimedia.org/wikipedia/commons/f/ff/RWS_Tarot_21_World.jpg", up: "完成、整合、成就", rev: "未完成、缺乏闭环" }
+    { id: 0, name: "愚者", url: "image/RWS_Tarot_00_Fool.jpg", up: "新的开始、天真、自由精神", rev: "鲁莽、轻率、风险" },
+    { id: 1, name: "魔术师", url: "image/RWS_Tarot_01_Magician.jpg", up: "创造力、技能、意志力", rev: "欺骗、才华被埋没" },
+    { id: 2, name: "女祭司", url: "image/RWS_Tarot_02_High_Priestess.jpg", up: "直觉、潜意识、神秘", rev: "秘密泄露、压抑情感" },
+    { id: 3, name: "皇后", url: "image/RWS_Tarot_03_Empress.jpg", up: "丰饶、母性、自然", rev: "依赖、创造力受阻" },
+    { id: 4, name: "皇帝", url: "image/RWS_Tarot_04_Emperor.jpg", up: "权威、结构、稳固", rev: "暴政、僵化、冷酷" },
+    { id: 5, name: "教皇", url: "image/RWS_Tarot_05_Hierophant.jpg", up: "传统、信仰、精神指引", rev: "挑战传统、虚伪" },
+    { id: 6, name: "恋人", url: "image/RWS_Tarot_06_Lover.jpg", up: "爱、和谐、选择", rev: "分离、不平衡、冲突" },
+    { id: 7, name: "战车", url: "image/RWS_Tarot_07_Chariot.jpg", up: "控制、意志力、胜利", rev: "失控、攻击性、失败" },
+    { id: 8, name: "力量", url: "image/RWS_Tarot_08_Strength.jpg", up: "力量、勇气、耐心", rev: "软弱、自我怀疑" },
+    { id: 9, name: "隐士", url: "image/RWS_Tarot_09_Hermit.jpg", up: "内省、孤独、指引", rev: "孤立、迷失" },
+    { id: 10, name: "命运之轮", url: "image/RWS_Tarot_10_Wheel_of_Fortune.jpg", up: "好运、因果、转折", rev: "厄运、抵抗改变" },
+    { id: 13, name: "死神", url: "image/RWS_Tarot_13_Death.jpg", up: "结束、转变、重生", rev: "抗拒改变、停滞" },
+    { id: 16, name: "高塔", url: "image/RWS_Tarot_16_Tower.jpg", up: "剧变、灾难、觉醒", rev: "避免灾难、恐惧改变" },
+    { id: 17, name: "星星", url: "image/RWS_Tarot_17_Star.jpg", up: "希望、信念、灵感", rev: "绝望、缺乏信心" },
+    { id: 18, name: "月亮", url: "image/RWS_Tarot_18_Moon.jpg", up: "幻觉、恐惧、潜意识", rev: "释放恐惧、不幸" },
+    { id: 19, name: "太阳", url: "image/RWS_Tarot_19_Sun.jpg", up: "快乐、成功、活力", rev: "消沉、暂时的挫折" },
+    { id: 21, name: "世界", url: "image/RWS_Tarot_21_World.jpg", up: "完成、整合、成就", rev: "未完成、缺乏闭环" }
 ];
 
 const PHASE_TITLES = ["第一章：过去 / 成因", "第二章：现在 / 现状", "第三章：未来 / 发展"];
